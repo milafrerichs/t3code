@@ -274,6 +274,22 @@ DMGs default to the host architecture. Use `--arch` to choose another target and
 to retain packaging files for inspection. Run `vp run dist:desktop:artifact --help` for other
 options.
 
+### macOS 12 (Monterey)
+
+Electron 44 requires macOS 13, so this branch pins Electron 43 (the last major that runs on
+Monterey, supported until January 2027) and keeps the main process on Electron 43's clipboard API.
+Two bundled natives declare a newer floor than Electron itself. `scripts/mac-after-pack.ts`
+reads the packaged Electron's `LSMinimumSystemVersion` and then lowers fff's `libfff_c.dylib`
+to it (the library links only libSystem and system frameworks), tolerates objc-js (it needs
+libc++'s `std::format` from macOS 13.3 and only loads for preview-browser passkeys, which fail
+gracefully), and fails the build for any other binary above the floor.
+
+Build an Intel DMG with the manual [Desktop macOS x64 (Monterey)](../../.github/workflows/desktop-macos-monterey.yml)
+workflow, or on any Mac with `vp run dist:desktop:dmg:x64`. The artifact is unsigned, so after
+copying it to `/Applications` run `xattr -dr com.apple.quarantine "/Applications/T3 Code (Beta).app"`
+once. Provider CLIs are separate installs with their own floors: Claude Code's and OpenCode's native
+builds need macOS 13, while the Codex CLI and the bundled Cursor SDK helpers run on 12.
+
 ### Prepared server bytecode
 
 Native macOS and Windows desktop artifact builds, and native Linux x64 and ARM64 builds, generate server

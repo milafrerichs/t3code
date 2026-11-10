@@ -2879,6 +2879,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
           }
         : {}),
     };
+    buildConfig.afterPack = path.join(repoRoot, "scripts/mac-after-pack.ts");
   }
 
   if (platform === "mac" && target === "dmg") {
