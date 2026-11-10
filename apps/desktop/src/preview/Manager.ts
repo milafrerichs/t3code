@@ -29,7 +29,6 @@ import { matchesKeybindingShortcut } from "@t3tools/shared/keybindings";
 import { normalizePreviewUrl } from "@t3tools/shared/preview";
 import {
   BrowserWindow,
-  ClipboardItem,
   app,
   type Session,
   clipboard,
@@ -3258,14 +3257,8 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
     if (image.isEmpty()) {
       return yield* new PreviewArtifactImageLoadError({ artifactPath: resolvedPath });
     }
-    yield* attemptPromise(
-      { operation: "copyArtifactToClipboard.write", artifactPath: resolvedPath },
-      () =>
-        clipboard.write([
-          new ClipboardItem({
-            "image/png": new Blob([Uint8Array.from(image.toPNG())], { type: "image/png" }),
-          }),
-        ]),
+    yield* attempt({ operation: "copyArtifactToClipboard.write", artifactPath: resolvedPath }, () =>
+      clipboard.writeImage(image),
     );
   });
 

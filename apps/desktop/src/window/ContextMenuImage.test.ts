@@ -12,13 +12,7 @@ const native = vi.hoisted(() => ({
 vi.mock("electron", () => ({
   net: { fetch: native.fetch },
   nativeImage: { createFromBuffer: native.createFromBuffer },
-  clipboard: { write: native.write },
-  ClipboardItem: class {
-    readonly blobs: Record<string, Blob>;
-    constructor(blobs: Record<string, Blob>) {
-      this.blobs = blobs;
-    }
-  },
+  clipboard: { writeImage: native.write },
 }));
 
 const mainFrame = { isDestroyed: vi.fn(() => false) };
@@ -53,7 +47,7 @@ beforeEach(() => {
   native.image.isEmpty.mockReturnValue(false);
   native.createFromBuffer.mockReturnValue(native.image);
   native.fetch.mockResolvedValue(new Response(Uint8Array.from(sourcePng)));
-  native.write.mockResolvedValue(undefined);
+  native.write.mockReturnValue(undefined);
   contents.executeJavaScriptInIsolatedWorld.mockRejectedValue(
     new Error("Image could not be decoded"),
   );
@@ -74,9 +68,8 @@ it.each(["https://example.com/image.png", `data:image/png;base64,${sourcePng.toS
     }
     expect(contents.copyImageAt).not.toHaveBeenCalled();
     expect(native.createFromBuffer).toHaveBeenCalledWith(sourcePng);
-    const blob = native.write.mock.calls[0]?.[0][0].blobs["image/png"] as Blob;
-    expect(blob.type).toBe("image/png");
-    expect(Buffer.from(await blob.arrayBuffer())).toEqual(Buffer.from("png"));
+    expect(native.write).toHaveBeenCalledWith(native.image);
+    expect(native.image.toPNG).toHaveBeenCalled();
   },
 );
 
@@ -87,9 +80,11 @@ it.each([
   native.fetch.mockResolvedValue(new Response(Uint8Array.from(Buffer.from(base64, "base64"))));
   native.image.isEmpty.mockReturnValue(true);
   contents.executeJavaScriptInIsolatedWorld.mockResolvedValue(Uint8Array.from(sourcePng).buffer);
+  const decoded = { isEmpty: vi.fn(() => false) };
+  native.createFromBuffer.mockReturnValueOnce(native.image).mockReturnValueOnce(decoded);
   await copyImage();
-  const blob = native.write.mock.calls[0]?.[0][0].blobs["image/png"] as Blob;
-  expect(Buffer.from(await blob.arrayBuffer())).toEqual(sourcePng);
+  expect(native.createFromBuffer).toHaveBeenLastCalledWith(sourcePng);
+  expect(native.write).toHaveBeenCalledWith(decoded);
   expect(native.image.toPNG).not.toHaveBeenCalled();
 });
 
@@ -110,9 +105,11 @@ it("copies a GIF larger than the favicon pixel limit", async () => {
   native.fetch.mockResolvedValue(new Response(Uint8Array.from(gif)));
   native.image.isEmpty.mockReturnValue(true);
   contents.executeJavaScriptInIsolatedWorld.mockResolvedValue(Uint8Array.from(sourcePng).buffer);
+  const decoded = { isEmpty: vi.fn(() => false) };
+  native.createFromBuffer.mockReturnValueOnce(native.image).mockReturnValueOnce(decoded);
   await copyImage();
-  const blob = native.write.mock.calls[0]?.[0][0].blobs["image/png"] as Blob;
-  expect(Buffer.from(await blob.arrayBuffer())).toEqual(sourcePng);
+  expect(native.createFromBuffer).toHaveBeenLastCalledWith(sourcePng);
+  expect(native.write).toHaveBeenCalledWith(decoded);
 });
 
 it.each([

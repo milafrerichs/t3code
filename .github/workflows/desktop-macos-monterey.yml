@@ -1,0 +1,79 @@
+# Builds an unsigned Intel DMG that runs on macOS 12 (Monterey). Electron 44
+# dropped macOS 12, so this branch pins Electron 43 and scripts/mac-after-pack.ts
+# keeps the bundled natives within Electron's own minimum. Manual only:
+#
+#   gh workflow run desktop-macos-monterey.yml --ref <branch>
+#   gh run watch && gh run download --name desktop-mac-x64-monterey
+#
+# The DMG is not signed or notarized. After copying the app to /Applications,
+# clear its quarantine flag once: xattr -dr com.apple.quarantine "/Applications/T3 Code (Beta).app"
+name: Desktop macOS x64 (Monterey)
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "macOS runner label. Intel runners build natively; Apple Silicon runners cross-build x64 under Rosetta."
+        type: string
+        default: macos-15-intel
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build macOS x64 DMG
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          install-args: --filter=t3... --filter=@t3tools/web... --filter=@t3tools/desktop... --filter=@t3tools/scripts...
+
+      - name: Ensure Rosetta for macOS x64 bytecode generation
+        shell: bash
+        run: |
+          if [[ "$(uname -m)" == "arm64" ]] && ! /usr/bin/arch -x86_64 /usr/bin/true; then
+            sudo /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+          fi
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+          targets: x86_64-apple-darwin
+
+      - name: Build desktop artifact
+        shell: bash
+        run: vp run dist:desktop:artifact --platform mac --target dmg --arch x64 --verbose
+
+      # An Electron bump past 43 would silently raise this to 13.0 again.
+      - name: Check the packaged minimum macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          hdiutil attach release/*.dmg -mountpoint "$RUNNER_TEMP/dmg" -nobrowse -quiet
+          app=$(find "$RUNNER_TEMP/dmg" -maxdepth 1 -name "*.app" -type d | head -n 1)
+          minimum=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$app/Contents/Info.plist")
+          hdiutil detach "$RUNNER_TEMP/dmg" -quiet
+          echo "LSMinimumSystemVersion=$minimum"
+          [[ "$minimum" == "12.0" ]]
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-mac-x64-monterey
+          path: |
+            release/*.dmg
+            release/*.zip
+          if-no-files-found: error
+          retention-days: 14

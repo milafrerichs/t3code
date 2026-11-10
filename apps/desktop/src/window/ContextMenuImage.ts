@@ -96,9 +96,7 @@ export async function copyContextMenuImage(
   }
   if (png.byteLength > MAX_IMAGE_BYTES) throw new Error("PNG exceeded the size limit");
   if (contents.isDestroyed() || frame.isDestroyed()) return;
-  await Electron.clipboard.write([
-    new Electron.ClipboardItem({
-      "image/png": new Blob([Uint8Array.from(png)], { type: "image/png" }),
-    }),
-  ]);
+  Electron.clipboard.writeImage(
+    image.isEmpty() ? Electron.nativeImage.createFromBuffer(png) : image,
+  );
 }

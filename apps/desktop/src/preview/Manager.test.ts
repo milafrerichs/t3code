@@ -143,7 +143,6 @@ describe("previewWindowOpenAction", () => {
 
 const {
   browserWindowConstructor,
-  clipboardItemConstructor,
   createFromPath,
   fromId,
   getFocusedWebContents,
@@ -155,7 +154,6 @@ const {
   writeClipboard,
 } = vi.hoisted(() => ({
   browserWindowConstructor: vi.fn(),
-  clipboardItemConstructor: vi.fn(),
   createFromPath: vi.fn((): { readonly isEmpty: () => boolean; readonly toPNG: () => Buffer } => ({
     isEmpty: () => false,
     toPNG: () => Buffer.from("png"),
@@ -167,20 +165,14 @@ const {
   showItemInFolder: vi.fn(),
   webviewSend: vi.fn(),
   writeFile: vi.fn((_path: string, _data: Uint8Array) => undefined),
-  writeClipboard: vi.fn(async () => undefined),
+  writeClipboard: vi.fn(() => undefined),
 }));
 
 vi.mock("electron", () => ({
   app: { getPath: vi.fn() },
   BrowserWindow: browserWindowConstructor,
-  // oxlint-disable-next-line typescript/no-extraneous-class -- This constructor-only mock implements the browser ClipboardItem API.
-  ClipboardItem: class {
-    constructor(data: Record<string, unknown>) {
-      clipboardItemConstructor(data);
-    }
-  },
   clipboard: {
-    write: writeClipboard,
+    writeImage: writeClipboard,
   },
   nativeImage: {
     createFromPath,
@@ -568,7 +560,6 @@ describe("PreviewManager", () => {
     previewSession.on.mockClear();
     writeFile.mockClear();
     showItemInFolder.mockClear();
-    clipboardItemConstructor.mockClear();
     writeClipboard.mockClear();
     createFromPath.mockClear();
     webviewSend.mockClear();

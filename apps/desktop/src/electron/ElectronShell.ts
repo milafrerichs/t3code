@@ -92,7 +92,10 @@ export const make = ElectronShell.of({
     );
   }),
   copyText: Effect.fn("ElectronShell.copyText")(function (text) {
-    return Effect.promise(() => Electron.clipboard.writeText(text).catch(() => undefined));
+    return Effect.try({
+      try: () => Electron.clipboard.writeText(text),
+      catch: () => "clipboard-unavailable" as const,
+    }).pipe(Effect.ignore);
   }),
 });
 
